@@ -1,41 +1,44 @@
 import yfinance as yf
 import pandas as pd
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
-def obter_dados_yfinance(simbolo, data_inicio, data_fim):
+def obter_dados_yfinance(simbolo, data_fim):
     """
-    Obtém dados de um ativo financeiro via YFinance.
+    Obtém dados de um ativo do Yahoo Finance.
     
     Args:
-        simbolo (str): Símbolo do ativo no YFinance (ex: '^BVSP' para IBOVESPA)
-        data_inicio (str): Data inicial no formato DD/MM/YYYY
-        data_fim (str): Data final no formato DD/MM/YYYY
-        
+        simbolo (str): Símbolo do ativo no Yahoo Finance
+        data_fim (date): Data final para obtenção dos dados
+    
     Returns:
-        pandas.DataFrame: DataFrame com os dados do ativo contendo as colunas:
-            - ano_mes: Mês no formato YYYY-MM
-            - valor: Variação percentual mensal do ativo
+        pd.DataFrame: DataFrame com os dados do ativo
     """
-    # Convertendo datas para o formato aceito pelo YFinance
-    data_inicio_obj = datetime.strptime(data_inicio, '%d/%m/%Y')
-    data_fim_obj = datetime.strptime(data_fim, '%d/%m/%Y')
+    # Calculando a data inicial (5 anos atrás)
+    data_inicio = data_fim - timedelta(days=5*365)
     
-    # Obtendo dados do ativo
-    ativo = yf.download(simbolo, start=data_inicio_obj, end=data_fim_obj, interval='1mo')
-    
-    # Calculando a variação percentual mensal
-    ativo['Retorno'] = ativo['Close'].pct_change() * 100
-    
-    # Criando DataFrame no formato compatível com o resto do código
-    df_ativo = pd.DataFrame({
-        'ano_mes': ativo.index.strftime('%Y-%m'),
-        'valor': ativo['Retorno']
-    })
-    
-    # Removendo a primeira linha que terá NaN devido ao cálculo de retorno
-    df_ativo = df_ativo.dropna()
-    
-    return df_ativo
+    try:
+        # Obtendo os dados do Yahoo Finance
+        ticker = yf.Ticker(simbolo)
+        dados = ticker.history(
+            start=data_inicio,
+            end=data_fim,
+            interval='1mo'
+        )
+        
+        # Calculando o retorno mensal
+        dados['retorno'] = dados['Close'].pct_change() * 100
+        
+        # Removendo a primeira linha (NaN)
+        dados = dados.dropna()
+        
+        # Adicionando a coluna de índice para referência
+        dados['index'] = dados.index
+        
+        return dados
+        
+    except Exception as e:
+        print(f"Erro ao obter dados do Yahoo Finance: {e}")
+        return None
 
 # Símbolos dos ativos para referência:
 # IBOVESPA: ^BVSP
