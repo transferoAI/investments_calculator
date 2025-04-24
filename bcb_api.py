@@ -26,22 +26,4 @@ def obter_serie_bcb(codigo_serie, data_inicio, data_fim):
         return df.groupby('ano_mes')['valor'].mean().reset_index()
     except Exception as e:
         st.warning(f"Erro ao obter dados da série {codigo_serie} do BCB: {e}")
-        return pd.DataFrame(columns=['ano_mes', 'valor'])
-
-def proteger_dataframe(df, nome):
-    """
-    Protege um DataFrame contra valores ausentes e formata para exibição.
-    
-    Args:
-        df (pd.DataFrame): DataFrame a ser protegido
-        nome (str): Nome da coluna de valor
-        
-    Returns:
-        pd.DataFrame: DataFrame formatado
-    """
-    if df.empty or 'valor' not in df:
-        st.warning(f"⚠️ Indicador {nome} não disponível no momento. Será ignorado no gráfico.")
-        return pd.DataFrame({'Mês': [], nome: []})
-    df = df.rename(columns={'valor': nome, 'ano_mes': 'Mês'})
-    df['Mês'] = df['Mês'].astype(str)
-    return df 
+        return pd.DataFrame(columns=['ano_mes', 'valor']) 

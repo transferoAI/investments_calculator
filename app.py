@@ -4,10 +4,10 @@ import matplotlib.pyplot as plt
 from datetime import datetime, date
 
 # Importando os módulos criados
-from bcb_api import obter_serie_bcb, proteger_dataframe
+from bcb_api import obter_serie_bcb
 from cvm_api import obter_rentabilidade_fundo_cvm
 from calculadora import calcular_rentabilidade_liquida
-from yfinance_api import obter_ibovespa_yfinance
+from yfinance_api import obter_dados_yfinance
 
 # Configuração da página
 st.set_page_config(layout="wide")
@@ -82,9 +82,16 @@ if calcular:
     # Obtenção dos indicadores econômicos
     cvm_cnpj = "54.776.432/0001-18"
     df_cdi = obter_serie_bcb(4390, data_inicio, data_fim_str)
-    df_ibovespa = obter_ibovespa_yfinance(data_inicio, data_fim_str)
     df_ipca = obter_serie_bcb(433, data_inicio, data_fim_str)
     df_selic = obter_serie_bcb(11, data_inicio, data_fim_str)
+    
+    # Usando a função genérica para obter dados do YFinance
+    df_ibovespa = obter_dados_yfinance('^BVSP', data_inicio, data_fim_str)
+    df_sp500 = obter_dados_yfinance('^GSPC', data_inicio, data_fim_str)
+    df_dolar = obter_dados_yfinance('BRL=X', data_inicio, data_fim_str)
+    df_ouro = obter_dados_yfinance('GC=F', data_inicio, data_fim_str)
+    
+    
 
     # Ajuste de formatos
     for df in [df_cdi, df_ipca, df_selic]:
@@ -132,12 +139,15 @@ if calcular:
         # Gráfico comparativo de rentabilidade
         st.markdown("### Comparativo de Rentabilidade Mensal")
         df_resultado['Mês'] = pd.PeriodIndex(df_resultado['Mês'], freq='M').astype(str)
-        fig2, ax2 = plt.subplots(figsize=(10, 5))
+        fig2, ax2 = plt.subplots(figsize=(12, 6))
         ax2.plot(df_resultado['Mês'], df_resultado['Rentabilidade Bruta (%)'], label='Fundo Transfero', marker='o')
         ax2.plot(df_cdi['ano_mes'], df_cdi['valor'], label='CDI', marker='x')
         ax2.plot(df_ibovespa['ano_mes'], df_ibovespa['valor'], label='IBOVESPA', marker='s')
-        ax2.plot(df_ipca['ano_mes'], df_ipca['valor'], label='IPCA', marker='^')
-        ax2.plot(df_selic['ano_mes'], df_selic['valor'], label='SELIC', marker='d')
+        ax2.plot(df_sp500['ano_mes'], df_sp500['valor'], label='S&P 500', marker='^')
+        ax2.plot(df_dolar['ano_mes'], df_dolar['valor'], label='Dólar', marker='d')
+        ax2.plot(df_ouro['ano_mes'], df_ouro['valor'], label='Ouro', marker='*')
+        ax2.plot(df_ipca['ano_mes'], df_ipca['valor'], label='IPCA', marker='v')
+        ax2.plot(df_selic['ano_mes'], df_selic['valor'], label='SELIC', marker='<')
         ax2.set_title("Rentabilidade Mensal: Fundo vs. Indicadores")
         ax2.set_xlabel("Mês")
         ax2.set_ylabel("Rentabilidade (%)")
