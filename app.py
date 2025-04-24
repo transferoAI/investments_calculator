@@ -10,14 +10,28 @@ st.set_page_config(layout="wide")
 
 # --- Funções ---
 def obter_serie_bcb(codigo_serie, data_inicio, data_fim):
-    url = f'https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo_serie}/dados?formato=json&dataInicial={data_inicio}&dataFinal={data_fim}'
-    response = requests.get(url)
-    dados = response.json()
-    df = pd.DataFrame(dados)
-    df['data'] = pd.to_datetime(df['data'], dayfirst=True)
-    df['valor'] = df['valor'].astype(float)
-    df['ano_mes'] = df['data'].dt.to_period('M')
-    return df.groupby('ano_mes')['valor'].mean().reset_index()
+    try:
+        url = f'https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo_serie}/dados?formato=json&dataInicial={data_inicio}&dataFinal={data_fim}'
+        response = requests.get(url)
+        response.raise_for_status()
+        dados = response.json()
+        df = pd.DataFrame(dados)
+        df['data'] = pd.to_datetime(df['data'], dayfirst=True)
+        df['valor'] = df['valor'].astype(float)
+        df['ano_mes'] = df['data'].dt.to_period('M')
+        return df.groupby('ano_mes')['valor'].mean().reset_index()
+    except Exception as e:
+        st.warning(f"Erro ao obter dados da série {codigo_serie} do BCB: {e}")
+        return pd.DataFrame(columns=['ano_mes', 'valor'])
+
+# --- Proteções para falhas em APIs externas ---
+def proteger_dataframe(df, nome):
+    if df.empty or 'valor' not in df:
+        st.warning(f"⚠️ Indicador {nome} não disponível no momento. Será ignorado no gráfico.")
+        return pd.DataFrame({'Mês': [], nome: []})
+    df = df.rename(columns={'valor': nome, 'ano_mes': 'Mês'})
+    df['Mês'] = df['Mês'].astype(str)
+    return df
 
 def obter_rentabilidade_fundo_cvm(cnpj_fundo, ano_mes_lista):
     cnpj_limpo = cnpj_fundo.replace('.', '').replace('/', '').replace('-', '')
