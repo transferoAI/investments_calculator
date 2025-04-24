@@ -46,10 +46,10 @@ def obter_rentabilidade_fundo_cvm(cnpj_fundo, ano_mes_lista):
                 for file in z.namelist():
                     if file.endswith('.csv'):
                         df = pd.read_csv(z.open(file), sep=';', encoding='latin1', dtype=str)
-                        if 'CNPJ_FUNDO' not in df.columns:
+                        if 'CNPJ_FUNDO_CLASSE' not in df.columns:
                             df.columns = df.iloc[0]
                             df = df[1:]
-                        df = df[df['CNPJ_FUNDO'].str.replace('.', '').str.replace('/', '').str.replace('-', '') == cnpj_limpo]
+                        df = df[df['CNPJ_FUNDO_CLASSE'].str.replace('.', '').str.replace('/', '').str.replace('-', '') == cnpj_limpo].str.replace('.', '').str.replace('/', '').str.replace('-', '') == cnpj_limpo]
                         df['DT_COMPTC'] = pd.to_datetime(df['DT_COMPTC'], errors='coerce')
                         df = df.sort_values('DT_COMPTC')
                         df['VL_QUOTA'] = pd.to_numeric(df['VL_QUOTA'].str.replace(',', '.'), errors='coerce')
