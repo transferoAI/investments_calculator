@@ -33,6 +33,7 @@ def proteger_dataframe(df, nome):
     df['Mês'] = df['Mês'].astype(str)
     return df
 
+# --- Ajuste na leitura do CSV da CVM ---
 def obter_rentabilidade_fundo_cvm(cnpj_fundo, ano_mes_lista):
     cnpj_limpo = cnpj_fundo.replace('.', '').replace('/', '').replace('-', '')
     resultados = []
@@ -44,9 +45,12 @@ def obter_rentabilidade_fundo_cvm(cnpj_fundo, ano_mes_lista):
             with zipfile.ZipFile(io.BytesIO(r.content)) as z:
                 for file in z.namelist():
                     if file.endswith('.csv'):
-                        df = pd.read_csv(z.open(file), sep=';', encoding='latin1')
-                        df = df[df['CNPJ_FUNDO'] == cnpj_limpo]
-                        df['DT_COMPTC'] = pd.to_datetime(df['DT_COMPTC'], format='%Y-%m-%d')
+                        df = pd.read_csv(z.open(file), sep=';', encoding='latin1', dtype=str)
+                        if 'CNPJ_FUNDO' not in df.columns:
+                            df.columns = df.iloc[0]
+                            df = df[1:]
+                        df = df[df['CNPJ_FUNDO'].str.replace('.', '').str.replace('/', '').str.replace('-', '') == cnpj_limpo]
+                        df['DT_COMPTC'] = pd.to_datetime(df['DT_COMPTC'], errors='coerce')
                         df = df.sort_values('DT_COMPTC')
                         df['VL_QUOTA'] = pd.to_numeric(df['VL_QUOTA'].str.replace(',', '.'), errors='coerce')
                         if not df.empty:
@@ -55,7 +59,7 @@ def obter_rentabilidade_fundo_cvm(cnpj_fundo, ano_mes_lista):
                             rentabilidade = ((fim / inicio) - 1) * 100
                             resultados.append({'mes': f"{ano}-{mes}", 'rentabilidade': rentabilidade})
         except Exception as e:
-            st.error(f"Erro ao processar {ano_mes}: {e}")
+            st.warning(f"Erro ao processar {ano_mes}: {e}")
     return resultados
 
 def calcular_rentabilidade_liquida(dados_fundo, df_cdi, capital_inicial, retirada_mensal=0, aporte_mensal=0, reinvestir=True):
