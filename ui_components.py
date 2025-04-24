@@ -39,46 +39,219 @@ def formatar_percentual(valor):
 
 def render_theme_selector():
     """Renderiza o seletor de tema e retorna o tema selecionado."""
+    # Inicializando o tema na sessão se não existir
+    if 'theme' not in st.session_state:
+        st.session_state.theme = "High Contrast"  # Definindo High Contrast como padrão
+    
     with st.sidebar:
         st.title("Configurações")
-        theme = st.selectbox(
+        # Usando session_state para manter o tema selecionado
+        selected_theme = st.selectbox(
             "Tema",
-            ["light", "dark"],
-            index=0
+            options=["High Contrast", "Light", "Dark", "Blue", "Green"],  # High Contrast como primeira opção
+            index=["High Contrast", "Light", "Dark", "Blue", "Green"].index(st.session_state.theme),
+            key="theme_selector"
         )
-    return theme
+        # Atualizando o tema na sessão
+        st.session_state.theme = selected_theme
+    
+    return selected_theme
 
 def apply_theme(theme):
     """Aplica o tema selecionado."""
-    if theme == "dark":
-        st.markdown("""
-            <style>
-                .stApp {
-                    background-color: #0E1117;
-                    color: #FAFAFA;
-                }
-                .stButton>button {
-                    background-color: #262730;
-                    color: #FAFAFA;
-                }
-                .stSelectbox>div>div {
-                    background-color: #262730;
-                    color: #FAFAFA;
-                }
-                .stTextInput>div>div>input {
-                    background-color: #262730;
-                    color: #FAFAFA;
-                }
-                .stDateInput>div>div>input {
-                    background-color: #262730;
-                    color: #FAFAFA;
-                }
-                .stCheckbox>div {
-                    background-color: #262730;
-                    color: #FAFAFA;
-                }
-            </style>
-        """, unsafe_allow_html=True)
+    # Garantindo que o tema seja uma string válida
+    theme = str(theme).strip()
+    if theme not in ["Light", "Dark", "Blue", "Green", "High Contrast"]:
+        theme = "Light"  # Tema padrão se receber um valor inválido
+        
+    theme_configs = {
+        "Light": {
+            "background": "#FFFFFF",
+            "text": "#262730",
+            "primary": "#FF4B4B",
+            "secondary": "#0068C9",
+            "accent": "#83C9FF",
+            "sidebar": "#F0F2F6",
+            "plot_background": "#FFFFFF",
+            "plot_text": "#262730",
+            "plot_grid": "#E5E5E5"
+        },
+        "Dark": {
+            "background": "#0E1117",
+            "text": "#FAFAFA",
+            "primary": "#FF4B4B",
+            "secondary": "#00C0F2",
+            "accent": "#00B4EB",
+            "sidebar": "#262730",
+            "plot_background": "#1E1E1E",
+            "plot_text": "#FAFAFA",
+            "plot_grid": "#333333"
+        },
+        "Blue": {
+            "background": "#EFF6FF",
+            "text": "#1E293B",
+            "primary": "#3B82F6",
+            "secondary": "#1D4ED8",
+            "accent": "#60A5FA",
+            "sidebar": "#DBEAFE",
+            "plot_background": "#EFF6FF",
+            "plot_text": "#1E293B",
+            "plot_grid": "#BFDBFE"
+        },
+        "Green": {
+            "background": "#F0FDF4",
+            "text": "#14532D",
+            "primary": "#22C55E",
+            "secondary": "#15803D",
+            "accent": "#4ADE80",
+            "sidebar": "#DCFCE7",
+            "plot_background": "#F0FDF4",
+            "plot_text": "#14532D",
+            "plot_grid": "#BBF7D0"
+        },
+        "High Contrast": {
+            "background": "#000000",
+            "text": "#FFFFFF",
+            "primary": "#FFFF00",
+            "secondary": "#00FF00",
+            "accent": "#FF00FF",
+            "sidebar": "#1A1A1A",
+            "plot_background": "#000000",
+            "plot_text": "#FFFFFF",
+            "plot_grid": "#333333"
+        }
+    }
+    
+    colors = theme_configs[theme]
+    
+    css = f"""
+        <style>
+            /* Main app */
+            .stApp {{
+                background-color: {colors["background"]};
+                color: {colors["text"]};
+            }}
+            
+            /* Sidebar */
+            section[data-testid="stSidebar"] {{
+                background-color: {colors["sidebar"]};
+            }}
+            
+            /* Buttons */
+            .stButton>button {{
+                background-color: {colors["primary"]};
+                color: {colors["background"]};
+                border: none;
+                border-radius: 4px;
+                padding: 0.5rem 1rem;
+                transition: all 0.2s;
+            }}
+            .stButton>button:hover {{
+                background-color: {colors["secondary"]};
+                transform: translateY(-2px);
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }}
+            
+            /* Input fields */
+            .stTextInput>div>div>input,
+            .stNumberInput>div>div>input,
+            .stDateInput>div>div>input {{
+                background-color: {colors["background"]};
+                color: {colors["text"]};
+                border: 1px solid {colors["accent"]};
+                border-radius: 4px;
+            }}
+            
+            /* Selectbox */
+            .stSelectbox>div>div {{
+                background-color: {colors["background"]};
+                color: {colors["text"]};
+                border: 1px solid {colors["accent"]};
+                border-radius: 4px;
+            }}
+            
+            /* Multiselect */
+            .stMultiSelect>div>div {{
+                background-color: {colors["background"]};
+                color: {colors["text"]};
+                border: 1px solid {colors["accent"]};
+                border-radius: 4px;
+            }}
+            
+            /* Checkbox */
+            .stCheckbox>div {{
+                background-color: {colors["background"]};
+                color: {colors["text"]};
+            }}
+            
+            /* Progress bar */
+            .stProgress>div>div>div>div {{
+                background-color: {colors["primary"]};
+            }}
+            
+            /* Plots */
+            .js-plotly-plot {{
+                background-color: {colors["plot_background"]};
+            }}
+            .js-plotly-plot .plotly .main-svg {{
+                background-color: {colors["plot_background"]} !important;
+            }}
+            
+            /* DataFrames */
+            .dataframe {{
+                background-color: {colors["background"]};
+                color: {colors["text"]};
+            }}
+            .dataframe th {{
+                background-color: {colors["accent"]};
+                color: {colors["text"]};
+            }}
+            
+            /* Metrics */
+            [data-testid="stMetricValue"] {{
+                color: {colors["primary"]};
+                font-weight: bold;
+            }}
+            
+            /* Headers */
+            h1, h2, h3, h4, h5, h6 {{
+                color: {colors["text"]};
+            }}
+            
+            /* Links */
+            a {{
+                color: {colors["primary"]};
+                text-decoration: none;
+            }}
+            a:hover {{
+                color: {colors["secondary"]};
+                text-decoration: underline;
+            }}
+            
+            /* Tooltips */
+            .stTooltipIcon {{
+                color: {colors["accent"]};
+            }}
+        </style>
+    """
+    
+    st.markdown(css, unsafe_allow_html=True)
+    
+    # Configurando o estilo dos gráficos matplotlib com parâmetros válidos
+    plt.style.use('default')
+    plt.rcParams.update({
+        'figure.facecolor': colors["plot_background"],
+        'axes.facecolor': colors["plot_background"],
+        'axes.edgecolor': colors["plot_text"],
+        'axes.labelcolor': colors["plot_text"],
+        'axes.grid': True,
+        'grid.color': colors["plot_grid"],
+        'grid.alpha': 0.3,
+        'text.color': colors["plot_text"],
+        'xtick.color': colors["plot_text"],
+        'ytick.color': colors["plot_text"],
+        'figure.dpi': 100
+    })
 
 def render_input_form():
     """Renderiza o formulário de entrada e retorna os valores inseridos."""
