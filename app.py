@@ -24,7 +24,6 @@ def obter_serie_bcb(codigo_serie, data_inicio, data_fim):
         st.warning(f"Erro ao obter dados da série {codigo_serie} do BCB: {e}")
         return pd.DataFrame(columns=['ano_mes', 'valor'])
 
-# --- Proteções para falhas em APIs externas ---
 def proteger_dataframe(df, nome):
     if df.empty or 'valor' not in df:
         st.warning(f"⚠️ Indicador {nome} não disponível no momento. Será ignorado no gráfico.")
@@ -33,7 +32,6 @@ def proteger_dataframe(df, nome):
     df['Mês'] = df['Mês'].astype(str)
     return df
 
-# --- Ajuste na leitura do CSV da CVM ---
 def obter_rentabilidade_fundo_cvm(cnpj_fundo, ano_mes_lista):
     cnpj_limpo = cnpj_fundo.replace('.', '').replace('/', '').replace('-', '')
     resultados = []
@@ -49,7 +47,8 @@ def obter_rentabilidade_fundo_cvm(cnpj_fundo, ano_mes_lista):
                         if 'CNPJ_FUNDO_CLASSE' not in df.columns:
                             df.columns = df.iloc[0]
                             df = df[1:]
-                        df = df[df['CNPJ_FUNDO_CLASSE'].str.replace('.', '').str.replace('/', '').str.replace('-', '') == cnpj_limpo].str.replace('.', '').str.replace('/', '').str.replace('-', '') == cnpj_limpo]
+                        df['CNPJ_FUNDO_CLASSE'] = df['CNPJ_FUNDO_CLASSE'].str.replace('.', '').str.replace('/', '').str.replace('-', '')
+                        df = df[df['CNPJ_FUNDO_CLASSE'] == cnpj_limpo]
                         df['DT_COMPTC'] = pd.to_datetime(df['DT_COMPTC'], errors='coerce')
                         df = df.sort_values('DT_COMPTC')
                         df['VL_QUOTA'] = pd.to_numeric(df['VL_QUOTA'].str.replace(',', '.'), errors='coerce')
@@ -111,26 +110,28 @@ data_fim_input = st.date_input("Data final da simulação", value=date.today(), 
 
 st.markdown("---")
 
-st.info("Baixando dados da CVM e indicadores BCB. Isso pode levar alguns segundos...")
+st.info("Baixando dados da CVM e indicadores do BCB. Isso pode levar alguns segundos...")
 
 data_inicio = '01/07/2024'
 data_fim_str = data_fim_input.strftime('%d/%m/%Y')
 
+# Obtenção dos indicadores econômicos
+cvm_cnpj = "54.776.432/0001-18"
 df_cdi = obter_serie_bcb(4390, data_inicio, data_fim_str)
 df_ibovespa = obter_serie_bcb(7, data_inicio, data_fim_str)
 df_ipca = obter_serie_bcb(433, data_inicio, data_fim_str)
-df_ifix = obter_serie_bcb(28501, data_inicio, data_fim_str)  # Supondo que esse seja o código correto
+df_ifix = obter_serie_bcb(28501, data_inicio, data_fim_str)
 
+# Ajuste de formatos
 for df in [df_cdi, df_ibovespa, df_ipca, df_ifix]:
     df['ano_mes'] = df['ano_mes'].astype(str)
 
-# Geração dinâmica das datas desejadas
 data_inicio_obj = datetime.strptime("2024-07", "%Y-%m")
 data_fim_obj = datetime(data_fim_input.year, data_fim_input.month, 1)
 data_range = pd.date_range(start=data_inicio_obj, end=data_fim_obj, freq='MS')
 datas_desejadas = [d.strftime("%Y-%m") for d in data_range]
 
-dados_fundo = obter_rentabilidade_fundo_cvm("54.776.432/0001-18", datas_desejadas)
+dados_fundo = obter_rentabilidade_fundo_cvm(cvm_cnpj, datas_desejadas)
 
 if not dados_fundo:
     st.error("Não foi possível obter os dados do fundo.")
@@ -160,13 +161,12 @@ else:
 
     st.markdown("### Comparativo de Rentabilidade Mensal")
     df_resultado['Mês'] = pd.PeriodIndex(df_resultado['Mês'], freq='M').astype(str)
-
     fig2, ax2 = plt.subplots(figsize=(10, 5))
     ax2.plot(df_resultado['Mês'], df_resultado['Rentabilidade Bruta (%)'], label='Fundo Transfero', marker='o')
-    ax2.plot(df_resultado['Mês'], df_cdi['valor'], label='CDI', marker='x')
-    ax2.plot(df_resultado['Mês'], df_ibovespa['valor'], label='IBOVESPA', marker='s')
-    ax2.plot(df_resultado['Mês'], df_ipca['valor'], label='IPCA', marker='^')
-    ax2.plot(df_resultado['Mês'], df_ifix['valor'], label='IFIX', marker='d')
+    ax2.plot(df_cdi['ano_mes'], df_cdi['valor'], label='CDI', marker='x')
+    ax2.plot(df_ibovespa['ano_mes'], df_ibovespa['valor'], label='IBOVESPA', marker='s')
+    ax2.plot(df_ipca['ano_mes'], df_ipca['valor'], label='IPCA', marker='^')
+    ax2.plot(df_ifix['ano_mes'], df_ifix['valor'], label='IFIX', marker='d')
     ax2.set_title("Rentabilidade Mensal: Fundo vs. Indicadores")
     ax2.set_xlabel("Mês")
     ax2.set_ylabel("Rentabilidade (%)")
