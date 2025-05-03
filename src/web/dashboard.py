@@ -2,8 +2,21 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
-import locale
-from historico_simulacoes import HistoricoSimulacoes
+from typing import Dict, List, Optional
+
+from src.core.types import (
+    SimulationParameters,
+    SimulationResults,
+    HistoricalSimulation,
+    APIData,
+    CalculationInput,
+    CalculationOutput
+)
+
+from src.core.interfaces import ISimulationHistory
+from src.core.exceptions import DataNotFoundError
+
+from src.utils.logging import project_logger
 
 # Configurando o locale para português do Brasil
 try:

@@ -4,6 +4,7 @@ Tipos personalizados para o projeto de Calculadora de Investimentos.
 
 from typing import Dict, List, Optional, TypedDict, Union
 from datetime import datetime
+import pandas as pd
 
 class SimulationParameters(TypedDict):
     """Parâmetros de uma simulação."""
@@ -50,7 +51,9 @@ class CalculationInput(TypedDict):
     aporte_mensal: float
     data_fim: datetime
     reinvestir: bool
-    dados_indicadores: Dict[str, APIData]
+    indicadores_selecionados: List[str]
+    mostrar_tendencias: bool
+    mostrar_estatisticas: bool
 
 class CalculationOutput(TypedDict):
     """Saída do cálculo."""

@@ -1,12 +1,21 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-# Removendo a importação do seaborn que não está sendo usado
-# import seaborn as sns
-import locale
-from datetime import date, datetime
+from datetime import datetime
+from typing import Dict, List, Optional
 
-# Configurando o locale para português do Brasil
+from src.core.types import (
+    SimulationParameters,
+    SimulationResults,
+    HistoricalSimulation,
+    APIData,
+    CalculationInput,
+    CalculationOutput
+)
+
+from src.core.interfaces import IUIComponent
+from src.core.exceptions import InvalidParameterError
+
+from src.utils.logging import project_logger
 try:
     locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
 except:
@@ -313,9 +322,45 @@ def render_input_form():
         
         st.markdown('</div>', unsafe_allow_html=True)
     
+    # Adicionando seletor de indicadores
+    indicadores_disponiveis = [
+        ('bcb', 'SELIC'),
+        ('yfinance', 'BOVA11.SA'),
+        ('yfinance', 'IBOV.SA')
+    ]
+    
+    indicadores_selecionados = render_indicator_selector(indicadores_disponiveis)
+    
+    # Opções de visualização
+    mostrar_tendencias = st.checkbox(
+        "📊 Mostrar Tendências",
+        value=True,
+        help="Mostra as tendências dos indicadores no gráfico"
+    )
+    
+    mostrar_estatisticas = st.checkbox(
+        "📊 Mostrar Estatísticas",
+        value=True,
+        help="Mostra estatísticas detalhadas dos resultados"
+    )
+    
     calcular = st.button("🔍 Calcular Rentabilidade")
     
-    return capital_investido, retirada_mensal, aporte_mensal, data_fim, reinvestir, taxa_inflacao, taxa_risco, calcular
+    if calcular:
+        return {
+            'capital_investido': capital_investido,
+            'retirada_mensal': retirada_mensal,
+            'aporte_mensal': aporte_mensal,
+            'data_fim': data_fim,
+            'reinvestir': reinvestir,
+            'taxa_inflacao': taxa_inflacao,
+            'taxa_risco': taxa_risco,
+            'indicadores_selecionados': indicadores_selecionados,
+            'mostrar_tendencias': mostrar_tendencias,
+            'mostrar_estatisticas': mostrar_estatisticas
+        }
+    
+    return None
 
 def render_indicator_selector(indicadores_disponiveis):
     """Renderiza o seletor de indicadores e retorna os indicadores selecionados."""
