@@ -16,22 +16,7 @@ from ui_components import (
     formatar_percentual
 )
 from yfinance_api import obter_dados_yfinance
-
-# Configurando o locale para português do Brasil
-try:
-    locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
-except:
-    try:
-        locale.setlocale(locale.LC_ALL, 'Portuguese_Brazil.1252')
-    except:
-        st.warning("Não foi possível configurar o locale para português do Brasil. Os valores monetários podem não ser exibidos corretamente.")
-
-# Configurando a página
-st.set_page_config(
-    page_title="Monitoramento de Investimentos",
-    page_icon="📈",
-    layout="wide"
-)
+from historico_simulacoes import HistoricoSimulacoes
 
 # Definindo os indicadores disponíveis
 indicadores_disponiveis = {
@@ -50,116 +35,150 @@ indicadores_disponiveis = {
     }
 }
 
-# Inicializando o estado da sessão
-if 'resultados' not in st.session_state:
-    st.session_state.resultados = None
-if 'indicadores_selecionados' not in st.session_state:
-    st.session_state.indicadores_selecionados = []
-if 'dados_indicadores' not in st.session_state:
-    st.session_state.dados_indicadores = {}
-
-# Renderizando o seletor de tema
-theme = render_theme_selector()
-apply_theme(theme)
-
-# Renderizando o formulário de entrada
-capital_investido, retirada_mensal, aporte_mensal, data_fim, reinvestir = render_input_form()
-
-# Renderizando o seletor de indicadores
-indicadores_selecionados, calcular = render_indicator_selector(indicadores_disponiveis)
-
-# Verificando se o botão de cálculo foi pressionado ou se já existem resultados
-if calcular or st.session_state.resultados is not None:
-    # Criando uma barra de progresso
-    progress_bar = st.progress(0)
-    status_text = st.empty()
+def main():
+    """Função principal da aplicação."""
+    # Inicializando o histórico
+    historico = HistoricoSimulacoes()
     
-    # Atualizando o status
-    status_text.text("Iniciando o cálculo de rentabilidade...")
-    progress_bar.progress(10)
-    
-    # Obtendo os dados do BCB
-    status_text.text("Obtendo dados do Banco Central do Brasil...")
-    dados_bcb = {}
-    for nome, codigo in indicadores_disponiveis['bcb'].items():
-        if nome in [ind[0] for ind in indicadores_selecionados if ind[1] == 'bcb']:
-            dados = obter_dados_bcb(codigo, data_fim)
-            if dados is not None:
-                dados_bcb[nome] = dados
-    
-    progress_bar.progress(40)
-    
-    # Obtendo os dados do YFinance
-    status_text.text("Obtendo dados do Yahoo Finance...")
-    dados_yfinance = {}
-    for nome, simbolo in indicadores_disponiveis['yfinance'].items():
-        if nome in [ind[0] for ind in indicadores_selecionados if ind[1] == 'yfinance']:
-            dados = obter_dados_yfinance(simbolo, data_fim)
-            if dados is not None:
-                dados_yfinance[simbolo] = dados
-    
-    progress_bar.progress(70)
-    
-    # Combinando os dados dos indicadores
-    status_text.text("Combinando dados dos indicadores...")
-    dados_indicadores = {**dados_bcb, **dados_yfinance}
-    
-    progress_bar.progress(80)
-    
-    # Calculando a rentabilidade
-    status_text.text("Calculando a rentabilidade...")
-    df_resultado = calcular_rentabilidade(
-        capital_investido=capital_investido,
-        retirada_mensal=retirada_mensal,
-        aporte_mensal=aporte_mensal,
-        data_fim=data_fim,
-        reinvestir=reinvestir,
-        dados_indicadores=dados_indicadores
+    # Configurando a página
+    st.set_page_config(
+        page_title="Monitoramento de Investimentos",
+        page_icon="",
+        layout="wide"
     )
     
-    progress_bar.progress(90)
+    # Renderizando o seletor de tema
+    theme = render_theme_selector()
+    apply_theme(theme)
     
-    # Salvando os resultados no estado da sessão
-    status_text.text("Finalizando o cálculo...")
-    st.session_state.resultados = df_resultado
-    st.session_state.indicadores_selecionados = indicadores_selecionados
-    st.session_state.dados_indicadores = dados_indicadores
-    
-    progress_bar.progress(100)
-    status_text.text("Cálculo concluído!")
-    
-    # Renderizando os resultados
-    render_results(df_resultado, dados_indicadores, indicadores_selecionados)
-    
-    # Adicionando botão para exportar resultados
-    if st.button("Exportar Resultados"):
-        # Preparando o DataFrame para exportação
-        df_export = df_resultado.copy()
-        df_export['Capital'] = df_export['Capital'].apply(formatar_moeda)
-        df_export['Retirada'] = df_export['Retirada'].apply(formatar_moeda)
-        df_export['Aporte'] = df_export['Aporte'].apply(formatar_moeda)
-        df_export['Saldo'] = df_export['Saldo'].apply(formatar_moeda)
-        df_export['Rentabilidade'] = df_export['Rentabilidade'].apply(formatar_percentual)
-        
-        # Adicionando os indicadores selecionados
-        for nome, tipo in indicadores_selecionados:
-            if tipo == 'bcb':
-                if nome in dados_indicadores:
-                    df_export[nome] = dados_indicadores[nome]['valor'].apply(formatar_percentual)
-            elif tipo == 'yfinance':
-                simbolo = dados_indicadores.get(nome)
-                if simbolo is not None and simbolo in dados_indicadores:
-                    df_export[nome] = dados_indicadores[simbolo]['retorno'].apply(formatar_percentual)
-        
-        # Convertendo para CSV
-        csv = df_export.to_csv(index=True).encode('utf-8')
-        
-        # Criando o botão de download
-        st.download_button(
-            label="Download CSV",
-            data=csv,
-            file_name=f"resultados_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
+    # Sidebar com opções
+    with st.sidebar:
+        st.title("")
+        pagina = st.radio(
+            "Selecione a página",
+            ["Calculadora", "Dashboard", "Histórico"],
+            index=0
         )
-else:
-    st.info("Preencha os campos acima e clique em 'Calcular Rentabilidade' para ver os resultados.")
+    
+    if pagina == "Calculadora":
+        # Renderizando o formulário de entrada
+        capital_investido, retirada_mensal, aporte_mensal, data_fim, reinvestir, taxa_inflacao, taxa_risco = render_input_form()
+        
+        # Renderizando o seletor de indicadores
+        indicadores_selecionados, calcular = render_indicator_selector(indicadores_disponiveis)
+        
+        # Verificando se o botão de cálculo foi pressionado ou se já existem resultados
+        if calcular or st.session_state.resultados is not None:
+            # Criando uma barra de progresso
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            # Atualizando o status
+            status_text.text("Iniciando o cálculo de rentabilidade...")
+            progress_bar.progress(10)
+            
+            # Obtendo os dados do BCB
+            status_text.text("Obtendo dados do Banco Central do Brasil...")
+            dados_bcb = {}
+            for nome, codigo in indicadores_disponiveis['bcb'].items():
+                if nome in [ind[0] for ind in indicadores_selecionados if ind[1] == 'bcb']:
+                    dados = obter_dados_bcb(codigo, data_fim)
+                    if dados is not None:
+                        dados_bcb[nome] = dados
+            
+            progress_bar.progress(40)
+            
+            # Obtendo os dados do YFinance
+            status_text.text("Obtendo dados do Yahoo Finance...")
+            dados_yfinance = {}
+            for nome, simbolo in indicadores_disponiveis['yfinance'].items():
+                if nome in [ind[0] for ind in indicadores_selecionados if ind[1] == 'yfinance']:
+                    dados = obter_dados_yfinance(simbolo, data_fim)
+                    if dados is not None:
+                        dados_yfinance[simbolo] = dados
+            
+            progress_bar.progress(70)
+            
+            # Calculando a rentabilidade
+            status_text.text("Calculando rentabilidade...")
+            df_resultado = calcular_rentabilidade(
+                capital_investido,
+                retirada_mensal,
+                aporte_mensal,
+                data_fim,
+                reinvestir,
+                {**dados_bcb, **dados_yfinance}
+            )
+            
+            progress_bar.progress(100)
+            status_text.text("Cálculo concluído!")
+            
+            # Salvando os resultados no histórico
+            resultados = {
+                'capital_inicial': capital_investido,
+                'retirada_mensal': retirada_mensal,
+                'aporte_mensal': aporte_mensal,
+                'data_fim': data_fim,
+                'reinvestir': reinvestir,
+                'taxa_inflacao': taxa_inflacao,
+                'taxa_risco': taxa_risco,
+                'capital_final': df_resultado['Saldo'].iloc[-1],
+                'rentabilidade_total': (df_resultado['Saldo'].iloc[-1] / df_resultado['Capital'].iloc[0] - 1) * 100,
+                'volatilidade': df_resultado['Saldo'].pct_change().std() * 100,
+                'indice_sharpe': (df_resultado['Saldo'].iloc[-1] / df_resultado['Capital'].iloc[0] - 1 - 0.0225) / (df_resultado['Saldo'].pct_change().std() * 100),
+                'indicadores': [ind[0] for ind in indicadores_selecionados]
+            }
+            
+            historico.adicionar_simulacao(resultados)
+            
+            # Renderizando os resultados
+            render_results(df_resultado, {**dados_bcb, **dados_yfinance}, indicadores_selecionados)
+    
+    elif pagina == "Dashboard":
+        st.markdown("# ")
+        st.markdown("")
+        
+        # Exibindo o dashboard
+        criar_dashboard()
+    
+    else:  # Histórico
+        st.markdown("# ")
+        
+        # Exibindo o histórico
+        todas_simulacoes = historico.obter_historico()
+        
+        if todas_simulacoes:
+            # Criando DataFrame com todas as simulações
+            df_historico = pd.DataFrame([
+                {
+                    'Data': sim['data'],
+                    'Capital Inicial': sim['parametros']['capital_inicial'],
+                    'Capital Final': sim['resultados']['capital_final'],
+                    'Rentabilidade': sim['resultados']['rentabilidade_total'],
+                    'Volatilidade': sim['resultados']['volatilidade'],
+                    'Índice Sharpe': sim['resultados']['indice_sharpe']
+                }
+                for sim in todas_simulacoes
+            ])
+            
+            # Exibindo tabela
+            st.dataframe(
+                df_historico.style.format({
+                    'Capital Inicial': formatar_moeda,
+                    'Capital Final': formatar_moeda,
+                    'Rentabilidade': formatar_percentual,
+                    'Volatilidade': formatar_percentual,
+                    'Índice Sharpe': '{:.2f}'
+                }),
+                use_container_width=True
+            )
+            
+            # Botão para exportar histórico
+            if st.button(""):
+                df_historico.to_excel("historico_simulacoes.xlsx", index=False)
+                st.success("")
+        else:
+            st.info("")
+
+if __name__ == "__main__":
+    main()

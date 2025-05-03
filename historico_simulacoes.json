@@ -1,0 +1,26 @@
+[
+  {
+    "data": "2025-05-02 22:56:24",
+    "parametros": {
+      "capital_inicial": 10000.0,
+      "retirada_mensal": 0.0,
+      "aporte_mensal": 0.0,
+      "data_fim": "2025-05-02",
+      "reinvestir": true,
+      "taxa_inflacao": 6.0,
+      "taxa_risco": 5.0
+    },
+    "resultados": {
+      "capital_final": 13083.108014190899,
+      "rentabilidade_total": 30.831080141908984,
+      "volatilidade": 2.1491965776526243,
+      "indice_sharpe": 0.13298495093048002
+    },
+    "indicadores": [
+      "CDI",
+      "Selic",
+      "IBOVESPA",
+      "S&P 500"
+    ]
+  }
+]
