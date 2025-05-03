@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TypedDict, Union, Any, Callable
 from datetime import datetime
 import pandas as pd
 
@@ -16,7 +16,10 @@ from src.core.types import (
 from src.core.interfaces import ISimulationHistory
 from src.core.exceptions import DataNotFoundError
 
-from src.utils.logging import project_logger
+from src.utils.logging import get_logger
+
+# Configuração inicial
+logger = get_logger(__name__)
 
 class HistoricoSimulacoes(ISimulationHistory):
     """Gerencia o histórico de simulações."""
@@ -33,7 +36,7 @@ class HistoricoSimulacoes(ISimulationHistory):
                 with open(self.arquivo, 'r') as f:
                     return json.load(f)
             except Exception as e:
-                self.logger.error(f"Erro ao carregar histórico: {str(e)}")
+                logger.error(f"Erro ao carregar histórico: {str(e)}")
                 return []
         return []
 
@@ -43,7 +46,7 @@ class HistoricoSimulacoes(ISimulationHistory):
             with open(self.arquivo, 'w') as f:
                 json.dump(self.historico, f, indent=2)
         except Exception as e:
-            self.logger.error(f"Erro ao salvar histórico: {str(e)}")
+            logger.error(f"Erro ao salvar histórico: {str(e)}")
 
     def add_simulation(self, simulation: HistoricalSimulation) -> None:
         """Adiciona uma nova simulação ao histórico."""
@@ -51,7 +54,7 @@ class HistoricoSimulacoes(ISimulationHistory):
             self.historico.append(simulation)
             self.salvar_historico()
         except Exception as e:
-            self.logger.error(f"Erro ao adicionar simulação: {str(e)}")
+            logger.error(f"Erro ao adicionar simulação: {str(e)}")
             raise DataNotFoundError(f"Erro ao adicionar simulação: {str(e)}")
 
     def get_history(self, limit: Optional[int] = None) -> List[HistoricalSimulation]:
@@ -61,7 +64,7 @@ class HistoricoSimulacoes(ISimulationHistory):
                 return self.historico[-limit:]
             return self.historico
         except Exception as e:
-            self.logger.error(f"Erro ao obter histórico: {str(e)}")
+            logger.error(f"Erro ao obter histórico: {str(e)}")
             raise DataNotFoundError(f"Erro ao obter histórico: {str(e)}")
 
     def get_statistics(self) -> Dict[str, float]:
@@ -88,5 +91,5 @@ class HistoricoSimulacoes(ISimulationHistory):
                 'Média de Capital Final': df['Capital Final'].mean()
             }
         except Exception as e:
-            self.logger.error(f"Erro ao obter estatísticas: {str(e)}")
+            logger.error(f"Erro ao obter estatísticas: {str(e)}")
             raise DataNotFoundError(f"Erro ao obter estatísticas: {str(e)}")

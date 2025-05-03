@@ -11,145 +11,316 @@
 import pandas as pd
 import numpy as np
 from datetime import date, datetime, timedelta
+from typing import Dict, List, Optional, TypedDict, Union, Any, Callable
+from .types import (
+    SimulationParameters,
+    SimulationResults,
+    CalculationInput,
+    CalculationOutput
+)
+from .exceptions import CalculationError, ValidationError
+from .interfaces import IInvestmentCalculator
 
-def calcular_rentabilidade(capital_investido, retirada_mensal, aporte_mensal, data_fim, reinvestir, dados_indicadores):
+class InvestmentCalculator(IInvestmentCalculator):
     """
-    Calcula a rentabilidade do investimento com base nos parâmetros fornecidos.
+    Implementação do calculador de investimentos.
+    
+    Esta classe implementa a interface IInvestmentCalculator e é responsável
+    por realizar todos os cálculos relacionados a investimentos.
+    
+    Exemplo:
+        calculator = InvestmentCalculator()
+        input_data = CalculationInput(...)
+        results = calculator.calculate(input_data)
+    """
+    
+    def calculate(self, input_data: CalculationInput) -> CalculationOutput:
+        """
+        Calcula a rentabilidade de um investimento.
+        
+        Args:
+            input_data (CalculationInput): Dados de entrada para o cálculo
+            
+        Returns:
+            CalculationOutput: Resultados do cálculo
+            
+        Raises:
+            ValidationError: Se os dados de entrada forem inválidos
+            CalculationError: Se ocorrer erro durante o cálculo
+        """
+        return calcular_rentabilidade(input_data)
+
+def calcular_rentabilidade(input_data: CalculationInput) -> CalculationOutput:
+    """
+    Calcula a rentabilidade de um investimento.
+    
+    Esta função é o ponto de entrada principal para cálculos de investimento.
+    Ela coordena todos os cálculos necessários e retorna os resultados
+    em um formato padronizado.
     
     Args:
-        capital_investido (float): Capital inicial investido
-        retirada_mensal (float): Valor da retirada mensal
-        aporte_mensal (float): Valor do aporte mensal
-        data_fim (date): Data final da simulação
-        reinvestir (bool): Se True, reinveste as retiradas no próximo mês
-        dados_indicadores (dict): Dicionário com os dados dos indicadores financeiros
+        input_data (CalculationInput): Dados de entrada para o cálculo
         
     Returns:
-        pd.DataFrame: DataFrame com os resultados da simulação contendo:
-            - index: Datas mensais da simulação
-            - Capital: Saldo inicial de cada mês
-            - Retirada: Valor retirado no mês (0 se reinvestir=True)
-            - Aporte: Valor aportado no mês
-            - Saldo: Saldo final do mês após rentabilidade, retiradas e aportes
-            - Rentabilidade: Rentabilidade mensal em percentual
-            
-    Processo:
-        1. Validação e conversão dos valores de entrada
-        2. Determinação do período de simulação
-        3. Inicialização do DataFrame de resultados
-        4. Para cada mês:
-           - Calcula rentabilidade média dos indicadores
-           - Aplica rentabilidade ao saldo
-           - Processa retiradas e aportes
-           - Atualiza saldo final
-            
-    Observações:
-        - A rentabilidade é calculada como média dos indicadores disponíveis
-        - Suporta indicadores do BCB (valor) e Yahoo Finance (retorno)
-        - Trata diferentes formatos de data e fuso horário
-        - Em caso de erro nos dados, ignora o indicador problemático
+        CalculationOutput: Resultados do cálculo
+        
+    Raises:
+        ValidationError: Se os dados de entrada forem inválidos
+        CalculationError: Se ocorrer erro durante o cálculo
+        
+    Exemplo:
+        input_data = CalculationInput(
+            parameters={
+                "initial_capital": 10000.0,
+                "monthly_contribution": 1000.0,
+                "monthly_withdrawal": 0.0,
+                "inflation_rate": 0.05,
+                "risk_free_rate": 0.10,
+                "start_date": datetime(2020, 1, 1),
+                "end_date": datetime(2023, 1, 1)
+            },
+            indicators_data={"SELIC": {...}}
+        )
+        results = calcular_rentabilidade(input_data)
     """
-    # Validação e conversão dos valores numéricos
+    
     try:
-        capital_investido = float(capital_investido)
-        retirada_mensal = float(retirada_mensal)
-        aporte_mensal = float(aporte_mensal)
-    except (ValueError, TypeError):
-        raise ValueError("Os valores de capital, retirada e aporte devem ser números válidos")
-    
-    # Convertendo a data_fim para datetime se necessário
-    if isinstance(data_fim, date):
-        data_fim = datetime.combine(data_fim, datetime.min.time())
-    
-    # Função auxiliar para converter datas para datetime sem fuso horário
-    def converter_para_datetime_sem_tz(data):
-        if isinstance(data, pd.Timestamp):
-            data = data.to_pydatetime()
-        if data.tzinfo is not None:
-            data = data.replace(tzinfo=None)
-        return data
-    
-    # Determinando a data inicial da simulação
-    datas_inicio = []
-    for dados in dados_indicadores.values():
-        if 'index' in dados and not dados['index'].empty:
-            # Convertendo para datetime e removendo informações de fuso horário
-            data = dados['index'].iloc[0]
-            data = converter_para_datetime_sem_tz(data)
-            datas_inicio.append(data)
-    
-    if not datas_inicio:
-        # Se não houver datas de indicadores, usar 5 anos atrás
-        data_inicio = data_fim - timedelta(days=5*365)
-    else:
-        data_inicio = min(datas_inicio)
-    
-    # Criando o range de datas mensais
-    datas = pd.date_range(start=data_inicio, end=data_fim, freq='M')
-    
-    # Inicializando o DataFrame de resultados
-    df_resultado = pd.DataFrame(index=datas)
-    df_resultado['Capital'] = capital_investido
-    df_resultado['Retirada'] = retirada_mensal
-    df_resultado['Aporte'] = aporte_mensal
-    df_resultado['Saldo'] = capital_investido
-    df_resultado['Rentabilidade'] = 0.0
-    
-    # Calculando a rentabilidade mês a mês
-    for i in range(1, len(df_resultado)):
-        # Obtendo o saldo do mês anterior
-        saldo_anterior = df_resultado['Saldo'].iloc[i-1]
+        # Validação dos dados de entrada
+        _validar_dados_entrada(input_data)
         
-        # Calculando a rentabilidade média dos indicadores
-        rentabilidade = 0.0
-        for nome, dados in dados_indicadores.items():
-            if 'index' in dados and not dados['index'].empty:
-                # Preparando a data atual para comparação
-                data_atual = df_resultado.index[i]
-                data_atual = converter_para_datetime_sem_tz(data_atual)
-                
-                # Convertendo datas do DataFrame para datetime sem fuso horário
-                dados_sem_tz = dados.copy()
-                dados_sem_tz['index'] = dados_sem_tz['index'].apply(converter_para_datetime_sem_tz)
-                
-                # Encontrando o índice mais próximo da data atual
-                indices_proximos = dados_sem_tz[dados_sem_tz['index'] <= data_atual]
-                
-                if not indices_proximos.empty:
-                    idx_mais_proximo = indices_proximos.index[-1]
-                    # Processando indicadores do BCB (valor)
-                    if 'valor' in dados.columns:
-                        try:
-                            valor = dados.loc[idx_mais_proximo, 'valor']
-                            if isinstance(valor, str):
-                                valor = float(valor.replace(',', '.'))
-                            rentabilidade += valor / len(dados_indicadores)
-                        except (ValueError, TypeError):
-                            continue
-                    # Processando indicadores do Yahoo Finance (retorno)
-                    elif 'retorno' in dados.columns:
-                        try:
-                            retorno = dados.loc[idx_mais_proximo, 'retorno']
-                            if isinstance(retorno, str):
-                                retorno = float(retorno.replace(',', '.'))
-                            rentabilidade += retorno / len(dados_indicadores)
-                        except (ValueError, TypeError):
-                            continue
+        # Extração dos parâmetros
+        params = input_data["parameters"]
         
-        # Atualizando o saldo com a rentabilidade
-        saldo_com_rentabilidade = saldo_anterior * (1 + rentabilidade/100)
+        # Cálculo da evolução mensal do capital
+        monthly_evolution = _calcular_evolucao_mensal(params)
         
-        # Aplicando retirada e aporte conforme a estratégia
-        if reinvestir:
-            saldo_final = saldo_com_rentabilidade + aporte_mensal
-        else:
-            saldo_final = saldo_com_rentabilidade - retirada_mensal + aporte_mensal
+        # Cálculo da rentabilidade mensal
+        monthly_profitability = _calcular_rentabilidade_mensal(monthly_evolution)
         
-        # Atualizando o DataFrame com os resultados do mês
-        df_resultado['Capital'].iloc[i] = saldo_anterior
-        df_resultado['Retirada'].iloc[i] = retirada_mensal if not reinvestir else 0
-        df_resultado['Aporte'].iloc[i] = aporte_mensal
-        df_resultado['Saldo'].iloc[i] = saldo_final
-        df_resultado['Rentabilidade'].iloc[i] = rentabilidade
+        # Cálculo da rentabilidade total
+        total_profitability = _calcular_rentabilidade_total(monthly_profitability)
+        
+        # Cálculo da rentabilidade anualizada
+        annualized_profitability = _calcular_rentabilidade_anualizada(
+            total_profitability,
+            params["start_date"],
+            params["end_date"]
+        )
+        
+        # Cálculo da volatilidade
+        volatility = _calcular_volatilidade(monthly_profitability)
+        
+        # Cálculo do índice de Sharpe
+        sharpe_index = _calcular_indice_sharpe(
+            annualized_profitability,
+            volatility,
+            params["risk_free_rate"]
+        )
+        
+        # Preparação dos resultados
+        results = SimulationResults(
+            final_capital=monthly_evolution[-1],
+            total_profitability=total_profitability,
+            annualized_profitability=annualized_profitability,
+            volatility=volatility,
+            sharpe_index=sharpe_index,
+            monthly_evolution=monthly_evolution,
+            monthly_profitability=monthly_profitability
+        )
+        
+        # Preparação dos dados processados
+        processed_data = {
+            "monthly_evolution": monthly_evolution,
+            "monthly_profitability": monthly_profitability
+        }
+        
+        return CalculationOutput(
+            results=results,
+            processed_data=processed_data
+        )
+        
+    except Exception as e:
+        raise CalculationError(
+            f"Erro ao calcular rentabilidade: {str(e)}",
+            {"input_data": input_data}
+        )
+
+def _validar_dados_entrada(input_data: CalculationInput) -> None:
+    """
+    Valida os dados de entrada para o cálculo.
     
-    return df_resultado 
+    Esta função verifica se todos os parâmetros necessários estão presentes
+    e se seus valores são válidos.
+    
+    Args:
+        input_data (CalculationInput): Dados de entrada a serem validados
+        
+    Raises:
+        ValidationError: Se os dados forem inválidos
+    """
+    
+    params = input_data["parameters"]
+    
+    # Validação do capital inicial
+    if params["initial_capital"] <= 0:
+        raise ValidationError(
+            "Capital inicial deve ser maior que zero",
+            {"field": "initial_capital", "value": params["initial_capital"]}
+        )
+    
+    # Validação das datas
+    if params["start_date"] >= params["end_date"]:
+        raise ValidationError(
+            "Data inicial deve ser anterior à data final",
+            {
+                "start_date": params["start_date"],
+                "end_date": params["end_date"]
+            }
+        )
+    
+    # Validação das taxas
+    if params["inflation_rate"] < 0:
+        raise ValidationError(
+            "Taxa de inflação não pode ser negativa",
+            {"field": "inflation_rate", "value": params["inflation_rate"]}
+        )
+    
+    if params["risk_free_rate"] < 0:
+        raise ValidationError(
+            "Taxa livre de risco não pode ser negativa",
+            {"field": "risk_free_rate", "value": params["risk_free_rate"]}
+        )
+
+def _calcular_evolucao_mensal(params: SimulationParameters) -> List[float]:
+    """
+    Calcula a evolução mensal do capital.
+    
+    Esta função simula a evolução do capital ao longo do tempo,
+    considerando aportes e retiradas mensais.
+    
+    Args:
+        params (SimulationParameters): Parâmetros da simulação
+        
+    Returns:
+        List[float]: Lista com a evolução mensal do capital
+    """
+    
+    capital = params["initial_capital"]
+    evolution = [capital]
+    
+    current_date = params["start_date"]
+    while current_date < params["end_date"]:
+        # Aplica aporte mensal
+        capital += params["monthly_contribution"]
+        
+        # Aplica retirada mensal
+        capital -= params["monthly_withdrawal"]
+        
+        # Aplica rentabilidade mensal (simplificado)
+        capital *= (1 + params["risk_free_rate"] / 12)
+        
+        evolution.append(capital)
+        current_date += timedelta(days=30)
+    
+    return evolution
+
+def _calcular_rentabilidade_mensal(evolution: List[float]) -> List[float]:
+    """
+    Calcula a rentabilidade mensal.
+    
+    Esta função calcula a rentabilidade mensal a partir da
+    evolução do capital.
+    
+    Args:
+        evolution (List[float]): Evolução mensal do capital
+        
+    Returns:
+        List[float]: Lista com a rentabilidade mensal
+    """
+    
+    profitability = []
+    for i in range(1, len(evolution)):
+        monthly_return = (evolution[i] - evolution[i-1]) / evolution[i-1]
+        profitability.append(monthly_return)
+    
+    return profitability
+
+def _calcular_rentabilidade_total(monthly_profitability: List[float]) -> float:
+    """
+    Calcula a rentabilidade total.
+    
+    Esta função calcula a rentabilidade total acumulada
+    a partir das rentabilidades mensais.
+    
+    Args:
+        monthly_profitability (List[float]): Rentabilidade mensal
+        
+    Returns:
+        float: Rentabilidade total
+    """
+    
+    return (1 + np.prod([1 + r for r in monthly_profitability])) - 1
+
+def _calcular_rentabilidade_anualizada(
+    total_profitability: float,
+    start_date: datetime,
+    end_date: datetime
+) -> float:
+    """
+    Calcula a rentabilidade anualizada.
+    
+    Esta função converte a rentabilidade total em uma
+    taxa anual equivalente.
+    
+    Args:
+        total_profitability (float): Rentabilidade total
+        start_date (datetime): Data inicial
+        end_date (datetime): Data final
+        
+    Returns:
+        float: Rentabilidade anualizada
+    """
+    
+    years = (end_date - start_date).days / 365
+    return (1 + total_profitability) ** (1 / years) - 1
+
+def _calcular_volatilidade(monthly_profitability: List[float]) -> float:
+    """
+    Calcula a volatilidade.
+    
+    Esta função calcula o desvio padrão das rentabilidades
+    mensais, que representa a volatilidade do investimento.
+    
+    Args:
+        monthly_profitability (List[float]): Rentabilidade mensal
+        
+    Returns:
+        float: Volatilidade
+    """
+    
+    return np.std(monthly_profitability) * np.sqrt(12)
+
+def _calcular_indice_sharpe(
+    annualized_profitability: float,
+    volatility: float,
+    risk_free_rate: float
+) -> float:
+    """
+    Calcula o índice de Sharpe.
+    
+    Esta função calcula o índice de Sharpe, que mede o
+    retorno ajustado ao risco do investimento.
+    
+    Args:
+        annualized_profitability (float): Rentabilidade anualizada
+        volatility (float): Volatilidade
+        risk_free_rate (float): Taxa livre de risco
+        
+    Returns:
+        float: Índice de Sharpe
+    """
+    
+    if volatility == 0:
+        return 0
+    
+    return (annualized_profitability - risk_free_rate) / volatility 

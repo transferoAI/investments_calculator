@@ -1,8 +1,10 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from datetime import datetime
 from typing import Dict, List, Optional
+import locale
 
 from src.core.types import (
     SimulationParameters,
@@ -16,7 +18,7 @@ from src.core.types import (
 from src.core.interfaces import ISimulationHistory
 from src.core.exceptions import DataNotFoundError
 
-from src.utils.logging import project_logger
+from src.utils.logging import get_logger
 
 # Configurando o locale para português do Brasil
 try:
@@ -26,6 +28,9 @@ except:
         locale.setlocale(locale.LC_ALL, 'Portuguese_Brazil.1252')
     except:
         pass
+
+# Configuração inicial
+logger = get_logger(__name__)
 
 def formatar_moeda(valor):
     """Formata um valor numérico como moeda brasileira (R$)."""

@@ -1,20 +1,20 @@
 import yfinance as yf
 import pandas as pd
-from datetime import datetime
-from typing import Dict, List, Optional
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, TypedDict, Union, Any, Callable
 
 from src.core.types import APIData
 from src.core.interfaces import IInvestmentDataFetcher
 from src.core.exceptions import APIError
 
-from src.utils.logging import project_logger
+from src.utils.logging import get_logger
 
 class YFinanceDataFetcher(IInvestmentDataFetcher):
     """Classe para obtenção de dados do Yahoo Finance."""
     
     def __init__(self):
         """Inicializa o fetcher."""
-        self.logger = project_logger
+        self.logger = get_logger(__name__)
     
     def fetch_data(self, indicators: List[str], end_date: datetime) -> Dict[str, APIData]:
         """
