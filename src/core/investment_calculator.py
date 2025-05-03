@@ -1,98 +1,55 @@
-from typing import Dict, List, Optional
-from datetime import datetime
+###############################################################################
+# Módulo de Cálculo de Rentabilidade
+###############################################################################
+# Este módulo é responsável por:
+# 1. Calcular a rentabilidade de investimentos ao longo do tempo
+# 2. Simular cenários com aportes e retiradas
+# 3. Integrar dados de diferentes indicadores financeiros
+###############################################################################
+
+# Importações necessárias
 import pandas as pd
 import numpy as np
+from datetime import date, datetime, timedelta
 
-from src.core.types import (
-    SimulationParameters,
-    SimulationResults,
-    HistoricalSimulation,
-    APIData,
-    CalculationInput,
-    CalculationOutput
-)
-
-from src.core.interfaces import IInvestmentCalculator
-from src.core.exceptions import CalculationError
-
-from src.services.bcb_api import BCBDataFetcher
-from src.services.cvm_api import CVMDataFetcher
-from src.services.yfinance_api import YFinanceDataFetcher
-from src.utils.logging import project_logger
-
-class InvestmentCalculator(IInvestmentCalculator):
-    """Classe principal para cálculo de investimentos."""
+def calcular_rentabilidade(capital_investido, retirada_mensal, aporte_mensal, data_fim, reinvestir, dados_indicadores):
+    """
+    Calcula a rentabilidade do investimento com base nos parâmetros fornecidos.
     
-    def __init__(self):
-        """Inicializa o calculador."""
-        self.bcb_fetcher = BCBDataFetcher()
-        self.cvm_fetcher = CVMDataFetcher()
-        self.yfinance_fetcher = YFinanceDataFetcher()
-        self.logger = project_logger
-    
-    def calculate(self, input_data: CalculationInput) -> CalculationOutput:
-        """
-        Calcula a rentabilidade do investimento.
+    Args:
+        capital_investido (float): Capital inicial investido
+        retirada_mensal (float): Valor da retirada mensal
+        aporte_mensal (float): Valor do aporte mensal
+        data_fim (date): Data final da simulação
+        reinvestir (bool): Se True, reinveste as retiradas no próximo mês
+        dados_indicadores (dict): Dicionário com os dados dos indicadores financeiros
         
-        Args:
-            input_data (CalculationInput): Dados de entrada para o cálculo
+    Returns:
+        pd.DataFrame: DataFrame com os resultados da simulação contendo:
+            - index: Datas mensais da simulação
+            - Capital: Saldo inicial de cada mês
+            - Retirada: Valor retirado no mês (0 se reinvestir=True)
+            - Aporte: Valor aportado no mês
+            - Saldo: Saldo final do mês após rentabilidade, retiradas e aportes
+            - Rentabilidade: Rentabilidade mensal em percentual
             
-        Returns:
-            CalculationOutput: Resultados do cálculo
-        
-        Raises:
-            CalculationError: Se ocorrer erro no cálculo
-        """
-        try:
-            # Obtendo dados dos indicadores
-            dados_indicadores = {}
+    Processo:
+        1. Validação e conversão dos valores de entrada
+        2. Determinação do período de simulação
+        3. Inicialização do DataFrame de resultados
+        4. Para cada mês:
+           - Calcula rentabilidade média dos indicadores
+           - Aplica rentabilidade ao saldo
+           - Processa retiradas e aportes
+           - Atualiza saldo final
             
-            for indicador in input_data['indicadores_selecionados']:
-                tipo, codigo = indicador
-                if tipo == 'bcb':
-                    dados = self.bcb_fetcher.fetch_data(codigo, input_data['data_fim'])
-                elif tipo == 'cvm':
-                    dados = self.cvm_fetcher.fetch_data(codigo, input_data['data_fim'])
-                elif tipo == 'yfinance':
-                    dados = self.yfinance_fetcher.fetch_data(codigo, input_data['data_fim'])
-                
-                if dados is not None:
-                    dados_indicadores[codigo] = dados
-            
-            # Calculando a rentabilidade
-            df_resultado = calcular_rentabilidade(
-                input_data['capital_investido'],
-                input_data['retirada_mensal'],
-                input_data['aporte_mensal'],
-                input_data['data_fim'],
-                input_data['reinvestir'],
-                dados_indicadores
-            )
-            
-            # Calculando métricas adicionais
-            rentabilidade_total = ((df_resultado['Saldo'].iloc[-1] / input_data['capital_investido']) - 1) * 100
-            volatilidade = df_resultado['Rentabilidade'].std()
-            indice_sharpe = rentabilidade_total / volatilidade if volatilidade != 0 else 0
-            
-            # Criando o resultado
-            resultados = {
-                'capital_final': df_resultado['Saldo'].iloc[-1],
-                'rentabilidade_total': rentabilidade_total,
-                'volatilidade': volatilidade,
-                'indice_sharpe': indice_sharpe
-            }
-            
-            return {
-                'df_resultado': df_resultado,
-                'indicadores_selecionados': input_data['indicadores_selecionados'],
-                'mostrar_tendencias': input_data['mostrar_tendencias'],
-                'mostrar_estatisticas': input_data['mostrar_estatisticas']
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Erro no cálculo: {str(e)}")
-            raise CalculationError(str(e))
-    # Garantindo que os valores numéricos sejam do tipo float
+    Observações:
+        - A rentabilidade é calculada como média dos indicadores disponíveis
+        - Suporta indicadores do BCB (valor) e Yahoo Finance (retorno)
+        - Trata diferentes formatos de data e fuso horário
+        - Em caso de erro nos dados, ignora o indicador problemático
+    """
+    # Validação e conversão dos valores numéricos
     try:
         capital_investido = float(capital_investido)
         retirada_mensal = float(retirada_mensal)
@@ -100,8 +57,7 @@ class InvestmentCalculator(IInvestmentCalculator):
     except (ValueError, TypeError):
         raise ValueError("Os valores de capital, retirada e aporte devem ser números válidos")
     
-    # Criando o DataFrame de resultados
-    # Convertendo a data_fim para datetime se for date
+    # Convertendo a data_fim para datetime se necessário
     if isinstance(data_fim, date):
         data_fim = datetime.combine(data_fim, datetime.min.time())
     
@@ -113,11 +69,11 @@ class InvestmentCalculator(IInvestmentCalculator):
             data = data.replace(tzinfo=None)
         return data
     
-    # Encontrando a data inicial como o mínimo entre as datas dos indicadores
+    # Determinando a data inicial da simulação
     datas_inicio = []
     for dados in dados_indicadores.values():
         if 'index' in dados and not dados['index'].empty:
-            # Convertendo para datetime se necessário e removendo informações de fuso horário
+            # Convertendo para datetime e removendo informações de fuso horário
             data = dados['index'].iloc[0]
             data = converter_para_datetime_sem_tz(data)
             datas_inicio.append(data)
@@ -128,9 +84,10 @@ class InvestmentCalculator(IInvestmentCalculator):
     else:
         data_inicio = min(datas_inicio)
     
-    # Criando o range de datas
+    # Criando o range de datas mensais
     datas = pd.date_range(start=data_inicio, end=data_fim, freq='M')
     
+    # Inicializando o DataFrame de resultados
     df_resultado = pd.DataFrame(index=datas)
     df_resultado['Capital'] = capital_investido
     df_resultado['Retirada'] = retirada_mensal
@@ -143,15 +100,15 @@ class InvestmentCalculator(IInvestmentCalculator):
         # Obtendo o saldo do mês anterior
         saldo_anterior = df_resultado['Saldo'].iloc[i-1]
         
-        # Calculando a rentabilidade do mês
+        # Calculando a rentabilidade média dos indicadores
         rentabilidade = 0.0
         for nome, dados in dados_indicadores.items():
             if 'index' in dados and not dados['index'].empty:
-                # Encontrando o índice mais próximo da data atual
+                # Preparando a data atual para comparação
                 data_atual = df_resultado.index[i]
                 data_atual = converter_para_datetime_sem_tz(data_atual)
                 
-                # Convertendo todas as datas do DataFrame para datetime sem fuso horário
+                # Convertendo datas do DataFrame para datetime sem fuso horário
                 dados_sem_tz = dados.copy()
                 dados_sem_tz['index'] = dados_sem_tz['index'].apply(converter_para_datetime_sem_tz)
                 
@@ -160,37 +117,35 @@ class InvestmentCalculator(IInvestmentCalculator):
                 
                 if not indices_proximos.empty:
                     idx_mais_proximo = indices_proximos.index[-1]
+                    # Processando indicadores do BCB (valor)
                     if 'valor' in dados.columns:
                         try:
                             valor = dados.loc[idx_mais_proximo, 'valor']
-                            # Garantindo que o valor seja numérico
                             if isinstance(valor, str):
                                 valor = float(valor.replace(',', '.'))
                             rentabilidade += valor / len(dados_indicadores)
                         except (ValueError, TypeError):
-                            # Se não conseguir converter, ignora este indicador
                             continue
+                    # Processando indicadores do Yahoo Finance (retorno)
                     elif 'retorno' in dados.columns:
                         try:
                             retorno = dados.loc[idx_mais_proximo, 'retorno']
-                            # Garantindo que o retorno seja numérico
                             if isinstance(retorno, str):
                                 retorno = float(retorno.replace(',', '.'))
                             rentabilidade += retorno / len(dados_indicadores)
                         except (ValueError, TypeError):
-                            # Se não conseguir converter, ignora este indicador
                             continue
         
         # Atualizando o saldo com a rentabilidade
         saldo_com_rentabilidade = saldo_anterior * (1 + rentabilidade/100)
         
-        # Aplicando retirada e aporte
+        # Aplicando retirada e aporte conforme a estratégia
         if reinvestir:
             saldo_final = saldo_com_rentabilidade + aporte_mensal
         else:
             saldo_final = saldo_com_rentabilidade - retirada_mensal + aporte_mensal
         
-        # Atualizando o DataFrame
+        # Atualizando o DataFrame com os resultados do mês
         df_resultado['Capital'].iloc[i] = saldo_anterior
         df_resultado['Retirada'].iloc[i] = retirada_mensal if not reinvestir else 0
         df_resultado['Aporte'].iloc[i] = aporte_mensal
