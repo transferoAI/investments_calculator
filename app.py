@@ -26,6 +26,7 @@ import pandas as pd
 from datetime import date, datetime
 import locale
 import plotly.express as px
+import plotly.graph_objects as go
 
 # Configuração da página Streamlit (deve ser o primeiro comando Streamlit)
 st.set_page_config(
@@ -49,6 +50,10 @@ from src.core.exceptions import APIError, CalculationError
 # Importações da interface
 # NOTA: A interface depende do core, mas não dos serviços
 from src.web.components.theme import render_theme_selector, apply_theme
+from src.web.pages.fund_data import render_fund_data_page
+
+# Importação de constantes
+from constants import FUNDO_CNPJ
 
 from src.web.ui_components import (
     render_input_form,
@@ -315,51 +320,20 @@ with abas[1]:
         st.info("Nenhuma simulação realizada ainda.")
 
 with abas[2]:
-    st.header("Rentabilidade do Fundo")
-    from constants import FUNDO_CNPJ
-    from src.services.cvm_api import CVMDataFetcher
-
-    visao = st.selectbox(
-        "Selecione a visão de rentabilidade",
-        ["Diária", "Mensal", "Semestral", "Anual"]
-    )
-
-    with st.spinner("Carregando dados do fundo..."):
-        fetcher = CVMDataFetcher()
-        try:
-            dados_fundo = fetcher.fetch_data([FUNDO_CNPJ], datetime.now())
-            if FUNDO_CNPJ in dados_fundo and not dados_fundo[FUNDO_CNPJ].empty:
-                df_fundo = dados_fundo[FUNDO_CNPJ].copy()
-                df_fundo = df_fundo.sort_values('index')
-                # Agrupamento conforme a visão
-                if visao == "Diária":
-                    df_visao = df_fundo.copy()
-                else:
-                    if visao == "Mensal":
-                        freq = 'M'
-                    elif visao == "Semestral":
-                        freq = '2Q'  # 2 trimestres = 6 meses
-                    elif visao == "Anual":
-                        freq = 'Y'
-                    df_fundo['periodo'] = pd.to_datetime(df_fundo['index']).dt.to_period(freq)
-                    df_visao = df_fundo.groupby('periodo').agg({
-                        'rentabilidade': 'sum',
-                        'index': 'first'
-                    }).reset_index(drop=True)
-                st.subheader(f"Tabela de Rentabilidade do Fundo ({visao})")
-                st.dataframe(df_visao, use_container_width=True)
-                st.subheader(f"Evolução da Rentabilidade do Fundo ({visao})")
-                fig = px.line(df_visao, x='index', y='rentabilidade', title=f'Evolução da Rentabilidade do Fundo ({visao})', labels={'index': 'Data', 'rentabilidade': 'Rentabilidade'})
-                st.plotly_chart(fig, use_container_width=True)
-                # Exportar CSV
-                csv_fundo = df_visao.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="Exportar Dados do Fundo (CSV)",
-                    data=csv_fundo,
-                    file_name=f"rentabilidade_fundo_{FUNDO_CNPJ}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                    mime="text/csv"
-                )
-            else:
-                st.warning("Nenhum dado encontrado para o fundo.")
-        except Exception as e:
-            st.error(f"Erro ao carregar dados do fundo: {str(e)}")
+    # -------------------------------------------------------------------
+    # Aba de Rentabilidade do Fundo
+    #
+    # Esta aba permite visualizar e atualizar os dados de rentabilidade
+    # do fundo de investimento. Ela oferece:
+    #
+    # 1. Atualização dos dados via CVM
+    # 2. Visualização do progresso do download
+    # 3. Exibição dos dados em diferentes periodicidades
+    # 4. Gráfico de evolução do valor da cota
+    #
+    # IMPORTANTE:
+    # - O download é incremental e idempotente
+    # - O progresso é atualizado em tempo real
+    # - Os dados são persistidos localmente
+    # -------------------------------------------------------------------
+    render_fund_data_page()
